@@ -13,6 +13,25 @@ from cvxpy.error import SolverError
 max_seed = 10 ** 9 + 7
 
 
+def anomaly_score_example(source: np.array, reconstructed: np.array):
+    """
+    Calculate anomaly score
+    :param source: original data
+    :param reconstructed: reconstructed data
+    :return:
+    """
+    n, d = source.shape
+    d_dis = np.zeros((d,))
+    for i in range(d):
+        dis = np.abs(source[:, i] - reconstructed[:, i])
+        dis = dis - np.mean(dis)
+        d_dis[i] = np.percentile(dis, 90)
+    if d <= 2:
+        return d / np.sum(1 / d_dis)
+    topn = 1 / d_dis[np.argsort(d_dis)][-1 * 2:]
+    return 2 / np.sum(topn)
+
+
 class WindowReconstructProcess():
     """
     窗口重建工作进程
@@ -145,6 +164,10 @@ if __name__ == '__main__':
         config_dict = yaml.load(file, Loader=yaml.Loader)
     data = pd.read_csv(config_dict['data']['path'], header=None)
 
+    # DEBUG
+    # Chop down data size
+    data = data[0:100]
+
     n, d = data.shape
 
     # Normalize each dimension
@@ -233,5 +256,26 @@ if __name__ == '__main__':
         win_l += stride
 
     # 预测
+    # 异常得分
+    anomaly_score = np.zeros((n,))
+    # 表示当时某个位置上被已重建窗口的数量
+    anomaly_score_weight = np.zeros((n,))
+    # 窗口左端点索引
+    wb = 0
+    while True:
+        we = min(n, wb + window)
+        # 窗口右端点索引 窗口数据[wb, we)
+        score = anomaly_score_example(data[wb:we], reconstructed[wb:we])
+        for i in range(we - wb):
+            w = i + wb
+            weight = anomaly_score_weight[w]
+            anomaly_score[w] = \
+                (anomaly_score[w] * weight + score) / (weight + 1)
+        anomaly_score_weight[wb:we] += 1
+        if we >= n:
+            break
+        wb += stride
+
+    # 接下来使用EVT等方式确定阈值，并做出检测
 
     print("Done")
