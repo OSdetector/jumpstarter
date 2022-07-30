@@ -1,8 +1,11 @@
 import pandas as pd
 import numpy as np
 import yaml
+from tqdm import tqdm
+
 
 from utils import data_process
+from utils.metrics import sliding_anomaly_predict
 from algorithm.cluster import cluster
 from algorithm.lesinn import online_lesinn
 from algorithm.sampling.localized_sample import localized_sample
@@ -162,11 +165,11 @@ if __name__ == '__main__':
     config = 'detector-config.yml'
     with open(config, 'r', encoding='utf8') as file:
         config_dict = yaml.load(file, Loader=yaml.Loader)
-    data = pd.read_csv(config_dict['data']['path'], header=None)
+    data = pd.read_csv(config_dict['data']['path'], header=1)
 
     # DEBUG
     # Chop down data size
-    data = data[0:100]
+    data = data.iloc[:, 1:2]
 
     n, d = data.shape
 
@@ -228,6 +231,7 @@ if __name__ == '__main__':
     total_retries = 0
     win_l = 0
     win_r = 0
+    pbar = tqdm(total=n)
     while win_r < n:
         win_r = min(n, win_l + window)
         group = cycle_groups[win_l // cycle]
@@ -254,6 +258,9 @@ if __name__ == '__main__':
                  rec_window[index]) / (weight + 1)
         reconstructing_weight[win_l:win_r] += 1
         win_l += stride
+        pbar.update(stride)
+
+    pbar.close()
 
     # 预测
     # 异常得分
@@ -277,5 +284,8 @@ if __name__ == '__main__':
         wb += stride
 
     # 接下来使用EVT等方式确定阈值，并做出检测
+    predict = sliding_anomaly_predict(anomaly_score, 100)
+
+    np.savetxt("predict.csv", predict, delimiter=",")
 
     print("Done")
