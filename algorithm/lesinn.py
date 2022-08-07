@@ -1,15 +1,24 @@
 import numpy as np
+import cupy as cp
 import random
+from time import perf_counter
+
+lesinn_cuda_kernel_raw = ""
+with open("algorithm/cuda/lesinn.cu") as f:
+    lesinn_cuda_kernel_raw = f.read()
+
+lesinn_cuda_kernel = cp.RawKernel(lesinn_cuda_kernel_raw, 'lesinn')
 
 
-def similarity(x, y):
+def similarity(x: np.ndarray, y: np.ndarray):
     """
     计算两个向量的相似度
     :param x:
     :param y:
     :return:
     """
-    return 1 / (1 + np.sqrt(np.sum(np.square(x - y))))
+    a = 1 / (1 + np.sqrt(np.sum(np.square(x - y))))
+    return a
 
 
 def online_lesinn(
@@ -39,13 +48,19 @@ def online_lesinn(
         all_data = incoming_data
     n, d = all_data.shape
     data_score = np.zeros((m,))
-    sample = set()
+
+    # incoming_data = cp.array(incoming_data, order='C')
+    # all_data = cp.array(all_data, order='C')
+
+    # lesinn_cuda_kernel(
+    #     (1,), (m,), (incoming_data, all_data, m, n, d, t, phi, data_score))
+    # cp.cuda.runtime.deviceSynchronize()
+    # return data_score
+
     for i in range(m):
         score = 0
         for j in range(t):
-            sample.clear()
-            while len(sample) < phi:
-                sample.add(random.randint(0, n - 1))
+            sample = random.sample(range(0, n), k=phi)
             nn_sim = 0
             for each in sample:
                 nn_sim = max(

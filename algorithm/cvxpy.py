@@ -1,6 +1,7 @@
 import scipy.fftpack as spfft
 import cvxpy as cvx
 import numpy as np
+from time import perf_counter
 
 from .custom_solver import OSQP
 
@@ -55,7 +56,7 @@ def reconstruct(n, d, index, value):
     objective = cvx.Minimize(cvx.norm(vx, 1))
     constraints = [transform_mat @ vx == b]
     prob = cvx.Problem(objective, constraints)
-    prob.solve(solver=OSQP())
+    prob.solve(solver='OSQP')
     x_transformed = np.array(vx.value).squeeze()
     # reconstruct signal
     x_t = x_transformed.reshape(d, n).T  # stack columns
